@@ -1,0 +1,77 @@
+=================================================
+== RISC-V 5-Stage Pipeline Simulation Results ==
+=================================================
+
+---
+[ 1 ] Program Executed
+---
+[cite_start]Source file: memfile.hex [cite: 1]
+Instructions loaded:
+@0x00: 00500293  (addi x5, x0, 5)
+@0x04: 00300313  (addi x6, x0, 3)
+@0x08: 006283B3  (add  x7, x5, x6)   // HAZARD: RAW on x5, x6
+@0x0C: 00002403  (lw   x8, 0(x0))
+@0x10: 00100493  (addi x9, x0, 1)
+@0x14: 00940533  (add  x10, x8, x9)  // HAZARD: Load-Use on x8, RAW on x9
+
+
+---
+[ 2 ] Pipeline Execution Trace (MIPS-Style)
+---
+(Showing instruction stage per clock cycle)
+
+Cycle:          1    2    3    4    5    6    7    8    9    10   11
+---------------------------------------------------------------------
+addi x5, x0, 5  IF   ID   EX   MEM  WB
+addi x6, x0, 3       IF   ID   EX   MEM  WB
+add  x7, x5, x6            IF   ID   EX   MEM  WB
+lw   x8, 0(x0)                  IF   ID   EX   MEM  WB
+addi x9, x0, 1                       IF   ID   EX   MEM  WB
+add  x10, x8, x9                      IF   ID   EX   MEM  WB
+(Note: Waveform shows no stalls, indicating full forwarding for register-to-register ops)
+
+
+---
+[ 3 ] Data Hazard Detection Log
+---
+This log demonstrates the forwarding unit in action as seen in the simulation waveform.
+
+[Cycle 5]: Instruction 'add x7, x5, x6' is in EXECUTE stage.
+  * [cite_start]SOURCE 1 (Rs1E): x5 (reg 05) [cite: 3]
+  * [cite_start]SOURCE 2 (Rs2E): x6 (reg 06) [cite: 3]
+  * HAZARD 1: 'addi x5' (dest 05) is in WRITEBACK stage.
+      * [cite_start]Condition: (RegWriteW=1) AND (RDW=05) AND (RS1_E=05) [cite: 3]
+      * [cite_start]Action: ForwardAE signal set to 01[cite: 3].
+  * HAZARD 2: 'addi x6' (dest 06) is in MEMORY stage.
+      * [cite_start]Condition: (RegWriteM=1) AND (RD_M=06) AND (RS2_E=06) [cite: 3]
+      * [cite_start]Action: ForwardBE signal set to 10[cite: 3].
+  * RESULT: Both operands (5 and 3) are successfully forwarded to the ALU. No stall.
+
+[Cycle 8]: Instruction 'add x10, x8, x9' is in EXECUTE stage.
+  * [cite_start]SOURCE 1 (Rs1E): x8 (reg 08) [cite: 2]
+  * [cite_start]SOURCE 2 (Rs2E): x9 (reg 09) [cite: 2]
+  * HAZARD 1: 'lw x8' (dest 08) is in WRITEBACK stage.
+      * This is a load-use case. The data (0x00000000) is being written back in this cycle.
+      * [cite_start]Condition: (RegWriteW=1) AND (RDW=08) AND (RS1_E=08) [cite: 2]
+      * [cite_start]Action: ForwardAE signal set to 01[cite: 2].
+  * HAZARD 2: 'addi x9' (dest 09) is in MEMORY stage.
+      * [cite_start]Condition: (RegWriteM=1) AND (RD_M=09) AND (RS2_E=09) [cite: 2]
+      * [cite_start]Action: ForwardBE signal set to 10[cite: 2].
+  * RESULT: Both operands (0 and 1) are successfully forwarded. No stall.
+
+
+---
+[ 4 ] Final Register State (Simulated)
+---
+(Values read from ResultW signal during each instruction's WB stage) [cite_start][cite: 2]
+
+* x5 (t0): 0x00000005
+* x6 (t1): 0x00000003
+* x7 (t2): 0x00000008  (Result of 5 + 3)
+* x8 (t3): 0x00000000  (Result of lw from address 0)
+* x9 (t4): 0x00000001
+* x10(t5): 0x00000001  (Result of 0 + 1)
+
+=================================================
+== End of Simulation ==
+=================================================
